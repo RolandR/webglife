@@ -1,5 +1,5 @@
 
-function Renderer(canvasId){
+function Renderer(canvasId, world){
 
 	var canvas = document.getElementById(canvasId);
 	var gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
@@ -7,11 +7,20 @@ function Renderer(canvasId){
 	var shaderProgram;
 	var size;
 
-	var canvasSizeAttr;
-	var pixels = new Uint8Array(canvas.width*canvas.height*4);
+	var onePixelAttr;
+	var doStepAttr;
+
+	var fba;
+	var fbb;
+	var txa;
+	var txb;
+
+	var worldTexture;
 
 	var lastHeight = canvas.height;
 	var lastWidth = canvas.width;
+
+	var superfast = window.location.search == "?superfast=true";
 
 	init();
 
@@ -54,6 +63,16 @@ function Renderer(canvasId){
 		// Use the combined shader program object
 		gl.useProgram(shaderProgram);
 
+		if(gl.getShaderInfoLog(vertShader)){
+			console.warn(gl.getShaderInfoLog(vertShader));
+		}
+		if(gl.getShaderInfoLog(fragShader)){
+			console.warn(gl.getShaderInfoLog(fragShader));
+		}
+		if(gl.getProgramInfoLog(shaderProgram)){
+			console.warn(gl.getProgramInfoLog(shaderProgram));
+		}
+
 
 		vertexBuffer = gl.createBuffer();
 
@@ -84,42 +103,93 @@ function Renderer(canvasId){
 
 		// Enable the attribute
 		gl.enableVertexAttribArray(coord);
-
-		canvasSizeAttr = gl.getUniformLocation(shaderProgram, "canvasSize");
-		textureSizeAttr = gl.getUniformLocation(shaderProgram, "textureSize");
-		texturrSizeAttr = gl.getUniformLocation(shaderProgram, "texturrSize");
+		
 		onePixelAttr = gl.getUniformLocation(shaderProgram, "onePixel");
+		doStepAttr = gl.getUniformLocation(shaderProgram, "doStep");
 
-		var texture = gl.createTexture();
-		gl.bindTexture(gl.TEXTURE_2D, texture);
+		worldTexture = gl.createTexture();
+		gl.bindTexture(gl.TEXTURE_2D, worldTexture);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-	}
-
-	function render(world){
-
-		gl.uniform2f(canvasSizeAttr, canvas.width, canvas.height);
-		gl.uniform2f(textureSizeAttr, lastWidth, lastHeight);
-		gl.uniform2f(texturrSizeAttr, lastWidth, lastHeight);
-		gl.uniform2f(onePixelAttr, 1/lastWidth, 1/lastHeight);
-
 		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, lastWidth, lastHeight, 0, gl.RGBA, gl.UNSIGNED_BYTE, world);
 
-		if(lastHeight != canvas.height || lastWidth != canvas.width){
-			gl.viewport(0, 0, canvas.width, canvas.height);
-			pixels = new Uint8Array(canvas.width*canvas.height*4);
+		// texture and framebuffer
+
+		txa = gl.createTexture();
+		gl.bindTexture(gl.TEXTURE_2D, txa);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+		
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, lastWidth, lastHeight, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+		
+		fba = gl.createFramebuffer();
+		gl.bindFramebuffer(gl.FRAMEBUFFER, fba);
+		
+		gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, txa, 0);
+
+		// texture and framebuffer
+
+		txb = gl.createTexture();
+		gl.bindTexture(gl.TEXTURE_2D, txb);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+		
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, lastWidth, lastHeight, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+		
+		fbb = gl.createFramebuffer();
+		gl.bindFramebuffer(gl.FRAMEBUFFER, fbb);
+		
+		gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, txb, 0);
+
+	}
+
+	function render(){
+		
+		gl.uniform2f(onePixelAttr, 1/lastWidth, 1/lastHeight);
+		gl.uniform1f(doStepAttr, true);
+
+		gl.bindTexture(gl.TEXTURE_2D, worldTexture);
+
+		renderInternally(false);
+		
+	}
+
+	function renderInternally(mode){
+
+		gl.uniform1f(doStepAttr, true);
+
+		if(mode){
+
+			gl.bindFramebuffer(gl.FRAMEBUFFER, fbb);
+
+			gl.drawArrays(gl.TRIANGLES, 0, size);
+
+			gl.bindTexture(gl.TEXTURE_2D, txb);
+
+		} else {
+			
+			gl.bindFramebuffer(gl.FRAMEBUFFER, fba);
+
+			gl.drawArrays(gl.TRIANGLES, 0, size);
+
+			gl.bindTexture(gl.TEXTURE_2D, txa);
+			
 		}
+
+		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+		gl.uniform1f(doStepAttr, false);
 
 		gl.drawArrays(gl.TRIANGLES, 0, size);
 
-		gl.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-
-		lastHeight = canvas.height;
-		lastWidth = canvas.width;
-
-		window.requestAnimationFrame(function(){render(pixels)});
+		if(superfast){
+			setTimeout(function(){renderInternally(!mode);}, 0);
+		} else {
+			window.requestAnimationFrame(function(){renderInternally(!mode);});
+		}
 		
 	}
 

@@ -36,11 +36,10 @@ function Webglife(){
 
 	cells[middle+width] = 255;*/
 
-	var renderer = new Renderer('renderCanvas');
-	renderer.render(cells);
+	var renderer = new Renderer('renderCanvas', cells);
+	renderer.render();
 	
 }
-
 
 
 
