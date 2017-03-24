@@ -1,23 +1,25 @@
 <!doctype html>
 <html allowfullscreen>
 	<head>
-		<meta charset="utf-8" /> 
+		<meta charset="utf-8"> 
 		<title>
 			WebGLife
 		</title>
-		<link rel="stylesheet" type="text/css" media="all" href="./style.css" /> 
+
+		<meta name="description" content="Conway's Game of Life implemented in WebGL">
+		<meta name="author" content="Roland Rytz">
+		<meta name="keywords" content="webgl, game of life, conway's life, html5">
+		<meta name="application-name" content="WebGLife">
+		<meta name="robots" content="index, follow">
+		
+		<link rel="stylesheet" type="text/css" media="all" href="./style.css"> 
 	</head>
 	<body>
-		<div id="loading">
-			<span id="loadingText">Loading...</span>
-			<div id="loadingContainer">
-				<div id="loadingBar"></div>
-			</div>
-		</div>
 		<div id="canvasContainer">
-			<canvas _oncontextmenu="return false;" id="renderCanvas" width="512" height="512"></canvas>
+			<canvas id="renderCanvas" width="512" height="512"></canvas>
 		</div>
-		<div id="debug"></div>
+
+		<img src="./thumbnail.png">
 
 		<script type="text/javascript" src="./vertexshader.js"></script>
 		<script type="text/javascript" src="./fragmentshader.js"></script>
